@@ -1,11 +1,11 @@
-# Requêtes HTTP
-requests
+# Telegram bot dernière version compatible avec main.py
+python-telegram-bot==20.5
 
-# Bot Telegram
-python-telegram-bot==20.3
+# OpenAI pour les appels GPT
+openai==1.29.0
 
-# OpenAI API
-openai
+# Utilitaires pour requêtes HTTP et JSON
+requests==2.31.0
 
-# Pour manipuler JSON, fichiers, etc. (souvent déjà inclus avec Python)
-# json et pathlib sont inclus dans Python standard
+# Gestion de l'environnement .env
+python-dotenv==1.0.1
