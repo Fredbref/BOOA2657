@@ -1,70 +1,71 @@
+# main.py
 import os
-import requests
-from fastapi import FastAPI, Request
-from openai import OpenAI
+import json
+from telegram import Update, Bot
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+import openai
 from dotenv import load_dotenv
 
+# ⚡ Charger les variables d'environnement
 load_dotenv()
-
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+AGENT_PATH = os.getenv("AGENT_PATH", "corvus-zero.json")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = OPENAI_API_KEY
 
-app = FastAPI()
+# ⚡ Charger les fichiers de l'agent
+with open(AGENT_PATH, "r", encoding="utf-8") as f:
+    agent_data = json.load(f)
 
-# 🔹 Charger les fichiers BOOA
-def load_file(path):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except:
-        return ""
+with open("identity.md", "r", encoding="utf-8") as f:
+    identity_text = f.read()
 
-IDENTITY = load_file("identity.md")
-SOUL = load_file("soul.md")
+with open("soul.md", "r", encoding="utf-8") as f:
+    soul_text = f.read()
 
-# 🔹 Envoyer message Telegram
-def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": text})
-
-# 🔹 Générer réponse de l'agent
-def agent_reply(user_message):
+# ⚡ Fonction pour générer la réponse via OpenAI
+def generate_response(user_message: str) -> str:
     prompt = f"""
-You are the following agent:
+    Agent: {agent_data.get('attributes', [{}])[0].get('value', 'Unknown Agent')}
+    Identity:
+    {identity_text}
+    
+    Soul:
+    {soul_text}
+    
+    Incoming message:
+    {user_message}
 
-IDENTITY:
-{IDENTITY}
+    Respond as the agent would, following their personality, skills, and boundaries.
+    """
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=300
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Erreur lors de la génération : {e}"
 
-SOUL:
-{SOUL}
+# ⚡ Gestionnaire de messages Telegram
+def handle_message(update: Update, context: CallbackContext):
+    user_text = update.message.text
+    reply = generate_response(user_text)
+    update.message.reply_text(reply)
 
-User message:
-{user_message}
+# ⚡ Lancer le bot
+def main():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dp = updater.dispatcher
 
-Respond EXACTLY as this agent would. Stay in character. No explanations.
-"""
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
-
-# 🔹 Webhook Telegram
-@app.post("/")
-async def telegram_webhook(req: Request):
-    data = await req.json()
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"]["text"]
-
-        reply = agent_reply(text)
-        send_message(chat_id, reply)
-
-    return {"ok": True}
+    print("Bot prêt !")
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    main()

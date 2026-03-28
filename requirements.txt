@@ -1,0 +1,11 @@
+# Requêtes HTTP
+requests
+
+# Bot Telegram
+python-telegram-bot==20.3
+
+# OpenAI API
+openai
+
+# Pour manipuler JSON, fichiers, etc. (souvent déjà inclus avec Python)
+# json et pathlib sont inclus dans Python standard
